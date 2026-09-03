@@ -17,7 +17,10 @@ declare global {
 function getDb(): Db {
   if (global.__drizzleDb) return global.__drizzleDb;
 
-  const url = (process.env.DATABASE_URL ?? "file:./local.db").trim();
+  // `||` on purpose, not `??` — an env var set to an empty string is just as
+  // "unset" as one that's missing entirely, and Vercel dashboards make it
+  // easy to save a variable with a blank value.
+  const url = (process.env.DATABASE_URL?.trim() || "file:./local.db");
   const authToken = process.env.DATABASE_AUTH_TOKEN?.trim() || undefined;
 
   const client =
