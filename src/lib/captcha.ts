@@ -1,7 +1,9 @@
 import { SignJWT, jwtVerify } from "jose";
 
+// `||` on purpose, not `??` — an env var saved with a blank value is just
+// as "unset" as one that's missing entirely (see src/db/client.ts).
 const secret = new TextEncoder().encode(
-  process.env.CAPTCHA_SECRET ?? "dev-only-captcha-secret-change-me"
+  process.env.CAPTCHA_SECRET || "dev-only-captcha-secret-change-me"
 );
 
 export interface CaptchaChallenge {

@@ -3,8 +3,10 @@ import bcrypt from "bcryptjs";
 
 export const ADMIN_SESSION_COOKIE = "admin_session";
 
+// `||` on purpose, not `??` — an env var saved with a blank value is just
+// as "unset" as one that's missing entirely (see src/db/client.ts).
 const secret = new TextEncoder().encode(
-  process.env.ADMIN_SESSION_SECRET ?? "dev-only-session-secret-change-me"
+  process.env.ADMIN_SESSION_SECRET || "dev-only-session-secret-change-me"
 );
 
 export async function verifyAdminPassword(password: string): Promise<boolean> {

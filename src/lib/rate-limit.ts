@@ -2,12 +2,10 @@ import { db } from "@/db/client";
 import { confessions, comments } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 
-const CONFESSION_RATE_LIMIT_SECONDS = Number(
-  process.env.RATE_LIMIT_SECONDS ?? 60
-);
-const COMMENT_RATE_LIMIT_SECONDS = Number(
-  process.env.COMMENT_RATE_LIMIT_SECONDS ?? 15
-);
+// `||` on purpose, not `??` — an env var saved with a blank value is just
+// as "unset" as one that's missing entirely (see src/db/client.ts).
+const CONFESSION_RATE_LIMIT_SECONDS = Number(process.env.RATE_LIMIT_SECONDS || 60);
+const COMMENT_RATE_LIMIT_SECONDS = Number(process.env.COMMENT_RATE_LIMIT_SECONDS || 15);
 
 export interface RateLimitResult {
   ok: boolean;

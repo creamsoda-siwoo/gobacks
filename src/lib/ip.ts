@@ -21,6 +21,8 @@ export function getClientIp(headers: Headers): string {
  * via any API response or UI.
  */
 export function hashIp(ip: string): string {
-  const secret = process.env.IP_HASH_SECRET ?? "dev-only-insecure-secret-change-me";
+  // `||` on purpose, not `??` — an env var saved with a blank value is just
+  // as "unset" as one that's missing entirely (see src/db/client.ts).
+  const secret = process.env.IP_HASH_SECRET || "dev-only-insecure-secret-change-me";
   return createHash("sha256").update(secret).update(ip).digest("hex");
 }
