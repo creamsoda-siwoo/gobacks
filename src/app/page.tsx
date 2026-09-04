@@ -30,7 +30,7 @@ export default async function HomePage() {
     likes: row.likes,
     postedAt: (row.approvedAt ?? row.createdAt).toISOString(),
   }));
-  const nextCursor = hasMore ? items[items.length - 1]?.id ?? null : null;
+  const nextCursor = hasMore ? String(items[items.length - 1]?.id) : null;
 
   return (
     <div>

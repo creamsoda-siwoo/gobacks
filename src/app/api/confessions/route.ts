@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
-import { confessions } from "@/db/schema";
-import { and, desc, eq, lt } from "drizzle-orm";
+import { confessions, CATEGORIES, type Category } from "@/db/schema";
+import { and, desc, eq, like, lt, or } from "drizzle-orm";
 import { submitConfessionSchema } from "@/lib/validation";
 import { findProfanity } from "@/lib/profanity";
 import { detectPii } from "@/lib/pii";
@@ -10,11 +10,43 @@ import { verifyCaptcha } from "@/lib/captcha";
 import { getClientIp, hashIp } from "@/lib/ip";
 
 const PAGE_SIZE = 20;
+const SEARCH_MAX_LENGTH = 100;
 
-// Public feed: approved confessions only, newest first, cursor-paginated.
+// Public feed: approved confessions only, cursor-paginated, with optional
+// category filter, content search, and sort (latest vs. most-liked).
 export async function GET(req: NextRequest) {
-  const cursorParam = req.nextUrl.searchParams.get("cursor");
-  const cursor = cursorParam ? Number(cursorParam) : undefined;
+  const params = req.nextUrl.searchParams;
+  const cursor = params.get("cursor");
+  const sort = params.get("sort") === "likes" ? "likes" : "latest";
+  const categoryParam = params.get("category");
+  const category =
+    categoryParam && (CATEGORIES as readonly string[]).includes(categoryParam)
+      ? (categoryParam as Category)
+      : null;
+  const q = params.get("q")?.trim().slice(0, SEARCH_MAX_LENGTH) || null;
+
+  const conditions = [eq(confessions.status, "approved")];
+  if (category) conditions.push(eq(confessions.category, category));
+  if (q) conditions.push(like(confessions.content, `%${q}%`));
+
+  if (cursor) {
+    if (sort === "likes") {
+      const [likesStr, idStr] = cursor.split("_");
+      const cursorLikes = Number(likesStr);
+      const cursorId = Number(idStr);
+      if (Number.isInteger(cursorLikes) && Number.isInteger(cursorId)) {
+        conditions.push(
+          or(
+            lt(confessions.likes, cursorLikes),
+            and(eq(confessions.likes, cursorLikes), lt(confessions.id, cursorId))
+          )!
+        );
+      }
+    } else {
+      const cursorId = Number(cursor);
+      if (Number.isInteger(cursorId)) conditions.push(lt(confessions.id, cursorId));
+    }
+  }
 
   const rows = await db
     .select({
@@ -27,16 +59,17 @@ export async function GET(req: NextRequest) {
       approvedAt: confessions.approvedAt,
     })
     .from(confessions)
-    .where(
-      cursor
-        ? and(eq(confessions.status, "approved"), lt(confessions.id, cursor))
-        : eq(confessions.status, "approved")
+    .where(and(...conditions))
+    .orderBy(
+      ...(sort === "likes"
+        ? [desc(confessions.likes), desc(confessions.id)]
+        : [desc(confessions.id)])
     )
-    .orderBy(desc(confessions.id))
     .limit(PAGE_SIZE + 1);
 
   const hasMore = rows.length > PAGE_SIZE;
-  const items = rows.slice(0, PAGE_SIZE).map((row) => ({
+  const page = rows.slice(0, PAGE_SIZE);
+  const items = page.map((row) => ({
     id: row.id,
     content: row.content,
     category: row.category,
@@ -44,7 +77,8 @@ export async function GET(req: NextRequest) {
     postedAt: row.approvedAt ?? row.createdAt,
   }));
 
-  const nextCursor = hasMore ? items[items.length - 1]?.id : null;
+  const last = page[page.length - 1];
+  const nextCursor = hasMore && last ? (sort === "likes" ? `${last.likes}_${last.id}` : String(last.id)) : null;
 
   return NextResponse.json({ items, nextCursor });
 }
