@@ -40,3 +40,7 @@ export const db: Db = new Proxy({} as Db, {
     return Reflect.get(getDb() as object, prop, receiver);
   },
 });
+
+// Exposed for the migration runner (src/instrumentation.ts), which needs the
+// real Db instance rather than the lazy Proxy above.
+export { getDb };
